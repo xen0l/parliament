@@ -83,6 +83,66 @@ def print_finding(finding, minimal_output=False, json_output=False):
         )
 
 
+def analyze_authorization_file(
+    auth_details_json,
+    private_auditors_custotm_path=None,
+    include_community_auditors=False,
+):
+    findings = []
+    for policy in auth_details_json["Policies"]:
+        # Ignore AWS defined policies
+        if "arn:aws:iam::aws:" not in policy["Arn"]:
+            continue
+
+        # Ignore AWS Service-linked roles
+        if (
+            policy["Path"] == "/service-role/"
+            or policy["Path"] == "/aws-service-role/"
+            or policy["PolicyName"].startswith("AWSServiceRoleFor")
+            or policy["PolicyName"].endswith("ServiceRolePolicy")
+            or policy["PolicyName"].endswith("ServiceLinkedRolePolicy")
+        ):
+            continue
+
+        for version in policy["PolicyVersionList"]:
+            if not version["IsDefaultVersion"]:
+                continue
+            policy = analyze_policy_string(
+                json.dumps(version["Document"]), policy["Arn"],
+            )
+            findings.extend(policy.findings)
+
+    # Review the inline policies on Users, Roles, and Groups
+    for user in auth_details_json["UserDetailList"]:
+        for policy in user.get("UserPolicyList", []):
+            policy = analyze_policy_string(
+                json.dumps(policy["PolicyDocument"]),
+                user["Arn"],
+                private_auditors_custom_path=private_auditors_custotm_path,
+                include_community_auditors=include_community_auditors,
+            )
+            findings.extend(policy.findings)
+    for role in auth_details_json["RoleDetailList"]:
+        for policy in role.get("RolePolicyList", []):
+            policy = analyze_policy_string(
+                json.dumps(policy["PolicyDocument"]),
+                role["Arn"],
+                private_auditors_custom_path=private_auditors_custotm_path,
+                include_community_auditors=include_community_auditors,
+            )
+            findings.extend(policy.findings)
+    for group in auth_details_json["GroupDetailList"]:
+        for policy in group.get("GroupPolicyList", []):
+            policy = analyze_policy_string(
+                json.dumps(policy["PolicyDocument"]),
+                group["Arn"],
+                private_auditors_custom_path=private_auditors_custotm_path,
+                include_community_auditors=include_community_auditors,
+            )
+            findings.extend(policy.findings)
+    return findings
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -164,57 +224,7 @@ def main():
         with open(args.auth_details_file) as f:
             contents = f.read()
             auth_details_json = json.loads(contents)
-            for policy in auth_details_json["Policies"]:
-                # Ignore AWS defined policies
-                if "arn:aws:iam::aws:" not in policy["Arn"]:
-                    continue
-
-                # Ignore AWS Service-linked roles
-                if (
-                    policy["Path"] == "/service-role/"
-                    or policy["Path"] == "/aws-service-role/"
-                    or policy["PolicyName"].startswith("AWSServiceRoleFor")
-                    or policy["PolicyName"].endswith("ServiceRolePolicy")
-                    or policy["PolicyName"].endswith("ServiceLinkedRolePolicy")
-                ):
-                    continue
-
-                for version in policy["PolicyVersionList"]:
-                    if not version["IsDefaultVersion"]:
-                        continue
-                    policy = analyze_policy_string(
-                        json.dumps(version["Document"]), policy["Arn"],
-                    )
-                    findings.extend(policy.findings)
-
-            # Review the inline policies on Users, Roles, and Groups
-            for user in auth_details_json["UserDetailList"]:
-                for policy in user.get("UserPolicyList", []):
-                    policy = analyze_policy_string(
-                        json.dumps(policy["PolicyDocument"]),
-                        user["Arn"],
-                        private_auditors_custom_path=args.private_auditors,
-                        include_community_auditors=args.include_community_auditors,
-                    )
-                    findings.extend(policy.findings)
-            for role in auth_details_json["RoleDetailList"]:
-                for policy in role.get("RolePolicyList", []):
-                    policy = analyze_policy_string(
-                        json.dumps(policy["PolicyDocument"]),
-                        role["Arn"],
-                        private_auditors_custom_path=args.private_auditors,
-                        include_community_auditors=args.include_community_auditors,
-                    )
-                    findings.extend(policy.findings)
-            for group in auth_details_json["GroupDetailList"]:
-                for policy in group.get("GroupPolicyList", []):
-                    policy = analyze_policy_string(
-                        json.dumps(policy["PolicyDocument"]),
-                        group["Arn"],
-                        private_auditors_custom_path=args.private_auditors,
-                        include_community_auditors=args.include_community_auditors,
-                    )
-                    findings.extend(policy.findings)
+            findings = analyze_authorization_file(auth_details_json)
     elif args.string:
         policy = analyze_policy_string(
             args.string,

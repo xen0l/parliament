@@ -1,6 +1,6 @@
 import unittest
 import json
-from parliament import analyze_policy_string
+from parliament.cli import analyze_authorization_file
 
 
 class TestAuthDetailsFile(unittest.TestCase):
@@ -172,53 +172,7 @@ class TestAuthDetailsFile(unittest.TestCase):
             }
           ]
         }
-        findings = []
-        for policy in auth_details_json["Policies"]:
-            # Ignore AWS defined policies
-            if "arn:aws:iam::aws:" not in policy["Arn"]:
-                continue
-            if (
-                policy["Path"] == "/service-role/"
-                or policy["Path"] == "/aws-service-role/"
-                or policy["PolicyName"].startswith("AWSServiceRoleFor")
-                or policy["PolicyName"].endswith("ServiceRolePolicy")
-                or policy["PolicyName"].endswith("ServiceLinkedRolePolicy")
-            ):
-                continue
-
-            for version in policy["PolicyVersionList"]:
-                if not version["IsDefaultVersion"]:
-                    continue
-                policy = analyze_policy_string(
-                    json.dumps(version["Document"]), policy["Arn"],
-                )
-                findings.extend(policy.findings)
-
-        # Review the inline policies on Users, Roles, and Groups
-        for user in auth_details_json["UserDetailList"]:
-            for policy in user.get("UserPolicyList", []):
-                policy = analyze_policy_string(
-                    json.dumps(policy["PolicyDocument"]),
-                    user["Arn"],
-                    private_auditors_custom_path=None,
-                )
-                findings.extend(policy.findings)
-        for role in auth_details_json["RoleDetailList"]:
-            for policy in role.get("RolePolicyList", []):
-                policy = analyze_policy_string(
-                    json.dumps(policy["PolicyDocument"]),
-                    role["Arn"],
-                    private_auditors_custom_path=None,
-                )
-                findings.extend(policy.findings)
-        for group in auth_details_json["GroupDetailList"]:
-            for policy in group.get("GroupPolicyList", []):
-                policy = analyze_policy_string(
-                    json.dumps(policy["PolicyDocument"]),
-                    group["Arn"],
-                    private_auditors_custom_path=None,
-                )
-                findings.extend(policy.findings)
+        findings = analyze_authorization_file(auth_details_json, None, False)
 
         expected_findings = "[RESOURCE_POLICY_PRIVILEGE_ESCALATION - Possible resource policy privilege escalation on * due to s3:DeleteObject not being allowed, but does allow s3:PutBucketPolicy - {'filepath': 'arn:aws:iam::012345678901:role/MyRole'}, RESOURCE_POLICY_PRIVILEGE_ESCALATION - Possible resource policy privilege escalation on * due to s3:DeleteObject not being allowed, but does allow s3:PutBucketAcl - {'filepath': 'arn:aws:iam::012345678901:role/MyRole'}, RESOURCE_POLICY_PRIVILEGE_ESCALATION - Possible resource policy privilege escalation on * due to s3:DeleteObject not being allowed, but does allow s3:PutLifecycleConfiguration - {'filepath': 'arn:aws:iam::012345678901:role/MyRole'}]"
         self.maxDiff = None
