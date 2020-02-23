@@ -1,6 +1,5 @@
-from parliament import is_arn_match, expand_action
-from policy_sentry.shared.database import connect_db
 from policy_sentry.querying.actions import get_actions_with_access_level
+from policy_sentry.shared.database import connect_db
 
 
 def audit(policy):

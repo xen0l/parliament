@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-from pathlib import Path
 import argparse
-from os import listdir
-from os.path import isfile, join, abspath
-import sys
 import json
 import re
+from os import listdir
+from os.path import isfile, join, abspath
+from pathlib import Path
 
 from parliament import analyze_policy_string, enhance_finding, override_config
 from parliament.misc import make_list
@@ -172,11 +171,11 @@ def main():
 
                 # Ignore AWS Service-linked roles
                 if (
-                        policy["Path"] == "/service-role/"
-                        or policy["Path"] == "/aws-service-role/"
-                        or policy["PolicyName"].startswith("AWSServiceRoleFor")
-                        or policy["PolicyName"].endswith("ServiceRolePolicy")
-                        or policy["PolicyName"].endswith("ServiceLinkedRolePolicy")
+                    policy["Path"] == "/service-role/"
+                    or policy["Path"] == "/aws-service-role/"
+                    or policy["PolicyName"].startswith("AWSServiceRoleFor")
+                    or policy["PolicyName"].endswith("ServiceRolePolicy")
+                    or policy["PolicyName"].endswith("ServiceLinkedRolePolicy")
                 ):
                     continue
 

@@ -3,12 +3,12 @@ This library is a linter for AWS IAM policies.
 """
 __version__ = "0.4.8"
 
-import os
-import json
-import yaml
-import re
 import fnmatch
+import json
+import re
+
 import pkg_resources
+import yaml
 
 # On initialization, load the IAM data
 iam_definition_path = pkg_resources.resource_filename(__name__, "iam_definition.json")
